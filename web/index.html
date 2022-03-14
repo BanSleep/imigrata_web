@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script async
+          src="https://pay.google.com/gp/p/js/pay.js"
+          onload="onGooglePayLoaded()"></script>
+  <script>
+const baseRequest = {
+  apiVersion: 2,
+  apiVersionMinor: 0
+};
+
+const allowedCardNetworks = ["AMEX", "DISCOVER", "INTERAC", "JCB", "MASTERCARD", "MIR", "VISA"];
+
+const allowedCardAuthMethods = ["PAN_ONLY", "CRYPTOGRAM_3DS"];
+
+const tokenizationSpecification = {
+  type: 'PAYMENT_GATEWAY',
+  parameters: {
+    'gateway': 'example',
+    'gatewayMerchantId': 'exampleGatewayMerchantId'
+  }
+};
+
+
+const baseCardPaymentMethod = {
+  type: 'CARD',
+  parameters: {
+    allowedAuthMethods: allowedCardAuthMethods,
+    allowedCardNetworks: allowedCardNetworks
+  }
+};
+
+const cardPaymentMethod = Object.assign(
+  {},
+  baseCardPaymentMethod,
+  {
+    tokenizationSpecification: tokenizationSpecification
+  }
+);
+
+
+let paymentsClient = null;
+
+
+function getGoogleIsReadyToPayRequest() {
+  return Object.assign(
+      {},
+      baseRequest,
+      {
+        allowedPaymentMethods: [baseCardPaymentMethod]
+      }
+  );
+}
+
+function getGooglePaymentDataRequest() {
+  const paymentDataRequest = Object.assign({}, baseRequest);
+  paymentDataRequest.allowedPaymentMethods = [cardPaymentMethod];
+  paymentDataRequest.transactionInfo = getGoogleTransactionInfo();
+  paymentDataRequest.merchantInfo = {
+    // @todo a merchant ID is available for a production environment after approval by Google
+    // See {@link https://developers.google.com/pay/api/web/guides/test-and-deploy/integration-checklist|Integration checklist}
+    // merchantId: '12345678901234567890',
+    merchantName: 'Example Merchant'
+  };
+  return paymentDataRequest;
+}
+
+function getGooglePaymentsClient() {
+  if ( paymentsClient === null ) {
+    paymentsClient = new google.payments.api.PaymentsClient({environment: 'TEST'});
+  }
+  return paymentsClient;
+}
+
+function onGooglePayLoaded() {
+  const paymentsClient = getGooglePaymentsClient();
+  paymentsClient.isReadyToPay(getGoogleIsReadyToPayRequest())
+      .then(function(response) {
+        if (response.result) {
+          addGooglePayButton();
+          // @todo prefetch payment data to improve performance after confirming site functionality
+          // prefetchGooglePaymentData();
+        }
+      })
+      .catch(function(err) {
+        // show error in developer console for debugging
+        console.error(err);
+      });
+}
+
+function addGooglePayButton() {
+  const paymentsClient = getGooglePaymentsClient();
+  const button =
+      paymentsClient.createButton({
+        onClick: onGooglePaymentButtonClicked,
+        allowedPaymentMethods: [baseCardPaymentMethod]
+      });
+  document.getElementById('container').appendChild(button);
+}
+
+
+function getGoogleTransactionInfo() {
+  return {
+    countryCode: 'US',
+    currencyCode: 'USD',
+    totalPriceStatus: 'FINAL',
+    // set to cart total
+    totalPrice: '0.01'
+  };
+}
+function prefetchGooglePaymentData() {
+  const paymentDataRequest = getGooglePaymentDataRequest();
+  // transactionInfo must be set but does not affect cache
+  paymentDataRequest.transactionInfo = {
+    totalPriceStatus: 'NOT_CURRENTLY_KNOWN',
+    currencyCode: 'USD'
+  };
+  const paymentsClient = getGooglePaymentsClient();
+  paymentsClient.prefetchPaymentData(paymentDataRequest);
+}
+
+function onGooglePaymentButtonClicked() {
+  const paymentDataRequest = getGooglePaymentDataRequest();
+  paymentDataRequest.transactionInfo = getGoogleTransactionInfo();
+
+  const paymentsClient = getGooglePaymentsClient();
+  paymentsClient.loadPaymentData(paymentDataRequest)
+      .then(function(paymentData) {
+        // handle the response
+        processPayment(paymentData);
+      })
+      .catch(function(err) {
+        // show error in developer console for debugging
+        console.error(err);
+      });
+}
+function processPayment(paymentData) {
+  // show returned data in developer console for debugging
+    console.log(paymentData);
+  // @todo pass payment token to your gateway to process payment
+  paymentToken = paymentData.paymentMethodData.tokenizationData.token;
+}</script>
+  <script>
+    async function onApplePayButtonClicked() {
+
+    // Consider falling back to Apple Pay JS if Payment Request is not available.
+    if (!PaymentRequest) {
+        return;
+    }
+
+    try {
+
+        // Define PaymentMethodData
+        const paymentMethodData = [{
+            "supportedMethods": "https://apple.com/apple-pay",
+            "data": {
+                "version": 3,
+                "merchantIdentifier": "merchant.com.example",
+                "merchantCapabilities": [
+                    "supports3DS"
+                ],
+                "supportedNetworks": [
+                    "amex",
+                    "discover",
+                    "masterCard",
+                    "visa"
+                ],
+                "countryCode": "US"
+            }
+        }];
+        // Define PaymentDetails
+        const paymentDetails = {
+            "total": {
+                "label": "My Merchant",
+                "amount": {
+                    "value": "27.50",
+                    "currency": "USD"
+                }
+            }
+        };
+        // Define PaymentOptions
+        const paymentOptions = {
+            "requestPayerName": false,
+            "requestBillingAddress": false,
+            "requestPayerEmail": false,
+            "requestPayerPhone": false,
+            "requestShipping": true,
+            "shippingType": "shipping"
+        };
+
+        // Create PaymentRequest
+        const request = new PaymentRequest(paymentMethodData, paymentDetails, paymentOptions);
+
+        request.onmerchantvalidation = event => {
+            // Call your own server to request a new merchant session.
+            const merchantSessionPromise = validateMerchant();
+            event.complete(merchantSessionPromise);
+        };
+
+        request.onpaymentmethodchange = event => {
+            // Define PaymentDetailsUpdate based on the selected payment method.
+            // No updates or errors needed, pass an object with the same total.
+            const paymentDetailsUpdate = {
+                'total': paymentDetails.total
+            };
+            event.updateWith(paymentDetailsUpdate);
+        };
+
+        request.onshippingoptionchange = event => {
+            // Define PaymentDetailsUpdate based on the selected shipping option.
+            // No updates or errors needed, pass an object with the same total.
+            const paymentDetailsUpdate = {
+                'total': paymentDetails.total
+            };
+            event.updateWith(paymentDetailsUpdate);
+        };
+
+        request.onshippingaddresschange = event => {
+            // Define PaymentDetailsUpdate based on a shipping address change.
+            const paymentDetailsUpdate = {
+                "total": {
+                    "label": "My Merchant",
+                    "amount": {
+                        "value": "27.50",
+                        "currency": "USD"
+                    }
+                }
+            };
+            event.updateWith(paymentDetailsUpdate);
+        };
+
+        const response = await request.show();
+        const status = "success";
+        await response.complete(status);
+    } catch (e) {
+        // Handle errors
+    }
+}
+  </script>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="imigrata">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <title>imigrata</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" type="text/css" href="splash/style.css">
+</head>
+<body style="position: fixed; inset: 0px; overflow: hidden; padding: 0px; margin: 0px; user-select: none; touch-action: none; font: 14px sans-serif; color: red;">
+  <!-- This script installs service_worker.js to provide PWA functionality to
+       application. For more information, see:
+       https://developers.google.com/web/fundamentals/primers/service-workers -->
+  <script>
+    var serviceWorkerVersion = null;
+    var scriptLoaded = false;
+    function loadMainDartJs() {
+      if (scriptLoaded) {
+        return;
+      }
+      scriptLoaded = true;
+      var scriptTag = document.createElement('script');
+      scriptTag.src = 'main.dart.js';
+      scriptTag.type = 'application/javascript';
+      document.body.append(scriptTag);
+    }
+
+    if ('serviceWorker' in navigator) {
+      // Service workers are supported. Use them.
+      window.addEventListener('load', function () {
+        // Wait for registration to finish before dropping the <script> tag.
+        // Otherwise, the browser will load the script multiple times,
+        // potentially different versions.
+        var serviceWorkerUrl = 'flutter_service_worker.js?v=' + serviceWorkerVersion;
+        navigator.serviceWorker.register(serviceWorkerUrl)
+          .then((reg) => {
+            function waitForActivation(serviceWorker) {
+              serviceWorker.addEventListener('statechange', () => {
+                if (serviceWorker.state == 'activated') {
+                  console.log('Installed new service worker.');
+                  loadMainDartJs();
+                }
+              });
+            }
+            if (!reg.active && (reg.installing || reg.waiting)) {
+              // No active web worker and we have installed or are installing
+              // one for the first time. Simply wait for it to activate.
+              waitForActivation(reg.installing || reg.waiting);
+            } else if (!reg.active.scriptURL.endsWith(serviceWorkerVersion)) {
+              // When the app updates the serviceWorkerVersion changes, so we
+              // need to ask the service worker to update.
+              console.log('New service worker available.');
+              reg.update();
+              waitForActivation(reg.installing);
+            } else {
+              // Existing service worker is still good.
+              console.log('Loading app from service worker.');
+              loadMainDartJs();
+            }
+          });
+
+        // If service worker doesn't succeed in a reasonable amount of time,
+        // fallback to plaint <script> tag.
+        setTimeout(() => {
+          if (!scriptLoaded) {
+            console.warn(
+              'Failed to load app from service worker. Falling back to plain <script> tag.',
+            );
+            loadMainDartJs();
+          }
+        }, 4000);
+      });
+    } else {
+      // Service workers not supported. Just drop the <script> tag.
+      loadMainDartJs();
+    }
+  </script>
+</body>
+</html>
