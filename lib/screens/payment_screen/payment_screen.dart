@@ -21,6 +21,7 @@ import 'package:imigrata_web/screens/successful_payment_screen/successful_paymen
 import 'package:imigrata_web/screens/survey_screen/widgets/validate_error.dart';
 import 'package:stripe/stripe.dart' as stripe;
 import 'package:stripe_payment/stripe_payment.dart';
+import 'package:web_browser_detect/web_browser_detect.dart';
 import 'cubit/cb_payment_screen.dart';
 import 'cubit/st_payment_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -108,6 +109,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    log(Browser().browser.toString(), name: "browser");
     log(kIsWeb.toString(), name: "isWeb");
     return AnnotatedRegion(
       value: SystemUiOverlayStyle.dark,
@@ -615,23 +617,72 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                                 ])),
                                           ),
                                         ] else if (kIsWeb) ...[
-                                          SizedBox(
-                                            height: 10,
-                                          ),
-                                          PjText(
-                                            text:
-                                            AppLocalizations.of(context)!
-                                                .or,
-                                            fontSize: 15,
-                                          ),
+                                          if (Browser().browser == 'Safari') ...[
+                                            SizedBox(
+                                              height: 10,
+                                            ),
+                                            PjText(
+                                              text:
+                                              AppLocalizations.of(context)!
+                                                  .or,
+                                              fontSize: 15,
+                                            ),
+                                            SizedBox(
+                                              height: 10,
+                                            ),
+                                            GestureDetector(
+                                              onTap: () async {
+                                                print(123);
+                                                await js.context.callMethod('onApplePayButtonClicked');
+                                              },
+                                              child: Container(
+                                                  width: 335,
+                                                  height: 45,
+                                                  decoration: BoxDecoration(
+                                                    color: PjColors.black,
+                                                    borderRadius:
+                                                    BorderRadius.circular(
+                                                        5),
+                                                  ),
+                                                  child: Center(
+                                                    child: Row(
+                                                      crossAxisAlignment:
+                                                      CrossAxisAlignment
+                                                          .center,
+                                                      mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .center,
+                                                      children: [
+                                                        PjText(
+                                                          text: AppLocalizations.of(
+                                                              context)!
+                                                              .buyWith,
+                                                          color: PjColors
+                                                              .white,
+                                                          fontSize: 25,
+                                                        ),
+                                                        SizedBox(
+                                                          width: 7.h,
+                                                        ),
+                                                        SvgPicture.asset(
+                                                          'assets/icons/applePay.svg',
+                                                          width: 63,
+                                                          height: 27,
+                                                          fit:
+                                                          BoxFit.none,
+                                                        )
+                                                      ],
+                                                    ),
+                                                  )),
+                                            ),
+                                          ],
                                           SizedBox(
                                             height: 10,
                                           ),
                                           GestureDetector(
                                             onTap: () async {
-                                                // await js.context.callMethod(
-                                                //     'onGooglePaymentButtonClicked');
-                                              await js.context.callMethod('onApplePayButtonClicked');
+                                                await js.context.callMethod(
+                                                    'onGooglePaymentButtonClicked');
                                             },
                                             child: Container(
                                                 width: 335,
@@ -660,7 +711,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                                         fontSize: 25,
                                                       ),
                                                       SizedBox(
-                                                        width: 7.w,
+                                                        width: 7.h,
                                                       ),
                                                       SvgPicture.asset(
                                                         'assets/icons/googlePay.svg',
@@ -673,6 +724,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                                   ),
                                                 )),
                                           ),
+                                          SizedBox(height: 10,),
                                         ],
                                         SizedBox(
                                           height: 30.w,
